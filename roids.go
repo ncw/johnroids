@@ -58,23 +58,7 @@ const (
 	scale               = 3
 )
 
-// return the current ship direction
-func ship_direction() int {
-	return object[0].state
-}
-
-// clip *z into the range 0 <= *z < w
-func CLIP(z *int, w int) {
-	if *z < 0 {
-		*z += w
-	}
-	if *z >= w {
-		*z -= w
-	}
-}
-
 // structures
-
 type object_block struct {
 	typ   int
 	state int
@@ -88,7 +72,6 @@ type object_block struct {
 }
 
 // static variables
-
 var (
 	screen       *image.Paletted
 	palette      color.Palette
@@ -148,20 +131,6 @@ func debugf(format string, a ...interface{}) {
 // Blow up with a fatal error
 func die(format string, a ...interface{}) {
 	fmt.Fprintf(os.Stderr, format+"\n", a...)
-	// va_list va;
-	// char *error;
-
-	// va_start(va, format_string);
-	// vfprintf(stderr, format_string, va);
-	// va_end(va);
-
-	// error = sdl.GetError();
-	// if (error && *error)
-	//     fprintf(stderr, "SDL error: '%s'\n", error);
-	// if (errno)
-	//     fprintf(stderr, "OS error : '%s'\n", strerror(errno));
-
-	// exit(EXIT_FAILURE);
 	os.Exit(1)
 }
 
@@ -182,16 +151,6 @@ func screen_initialise() func() {
 		die("Couldn't initialize SDL: %v", err)
 	}
 
-	/*
-		// Initialize the display in a SWxSH 8-bit palettized mode
-		screen = sdl.SetVideoMode(SW, SH, 8, sdl.SWSURFACE|sdl.DOUBLEBUF)
-		//    screen = sdl.SetVideoMode(SW, SH, 8, sdl.FULLSCREEN | sdl.DOUBLEBUF);
-		if screen == nil {
-			die("Couldn't set %ix%ix8 video mode: %s\n", SW, SH, sdl.GetError())
-		}
-
-		sdl.WM_SetCaption("JohnRoids", "JohnRoids")
-	*/
 	window, err := sdl.CreateWindow("JohnRoids", sdl.WINDOWPOS_UNDEFINED, sdl.WINDOWPOS_UNDEFINED, SW*scale, SH*scale, sdl.WINDOW_SHOWN)
 	if err != nil {
 		panic(err)
@@ -416,16 +375,6 @@ func load_sprite(name string) int {
 	if spritepointer >= maxsprites {
 		die("Too many sprites")
 	}
-
-	// // Load the BMP file into a surface
-	// sdlImage, err := img.Load(path)
-	// if err != nil {
-	// 	die("Couldn't load sprite %s: %v", path, err)
-	// }
-	// sprite[spritepointer] = sdlImage
-
-	// // Set the colour key for blitting
-	// sdlImage.SetColorKey(true, 0)
 
 	n := spritepointer
 	spritepointer++
@@ -687,6 +636,11 @@ func roidfire(parent *object_block) {
 	nroids++
 }
 
+// return the current ship direction
+func ship_direction() int {
+	return object[0].state
+}
+
 // This fires a bullet from the ship
 func fire() {
 	obj := findspace()
@@ -817,26 +771,6 @@ func explode_object(obj *object_block, x int, y int, particles int, mean_speed i
 			}
 		}
 	}
-
-	//  for (; particles > 0; particles--)
-	//  {
-	//      object_block *p = findspace();
-	//      p.typ = dust;
-	//      p.state = colour_row < 0 ? (rand.Int() % fade_colours) : colour_row;
-	//      //p.life = time_now + (rand.Int() & life_mask);
-	//      p.life = time_now + life_mask;
-	//      p.x = x;
-	//      p.y = y;
-	//      //angle = rand.Int() & 0xFF;
-	//      speed = mean_speed;
-	//      if (speed_mask)
-	//          speed -= (rand.Int() & speed_mask);
-	//      p.dx = dx + ( cos_table2[angle >> 8] * speed ) / COS_TABLE_SCALE;
-	//      p.dy = dy + ( sin_table2[angle >> 8] * speed ) / COS_TABLE_SCALE;
-	//      //p.dx = dx + (rand.Int() & 0xFF) - 0x80;
-	//      //p.dy = dy + (rand.Int() & 0xFF) - 0x80;
-	//      angle += dangle;
-	// }
 }
 
 // This makes an explosion at the object pointed to by r0
@@ -902,17 +836,27 @@ func roidexplosion(obj *object_block, x int, y int) {
 	// sound_roidexplosion();
 }
 
+// clip *z into the range 0 <= *z < w
+func clip(z *int, w int) {
+	if *z < 0 {
+		*z += w
+	}
+	if *z >= w {
+		*z -= w
+	}
+}
+
 // This updates the co-ordinates of the object in r0 co-ordinates
 func update(obj *object_block) {
 	sy := obj.y
 	sx := obj.x
 
 	sx = dtime*obj.dx + sx // scale for time
-	CLIP(&sx, SW<<pixelshift)
+	clip(&sx, SW<<pixelshift)
 	obj.x = sx // x+=dx
 
 	sy = dtime*obj.dy + sy // scale for time
-	CLIP(&sy, SH<<pixelshift)
+	clip(&sy, SH<<pixelshift)
 	obj.y = sy // y+=dy
 
 	// if object is mortal and over age limit, kill it
@@ -924,20 +868,6 @@ func update(obj *object_block) {
 		obj.typ = 0
 		// return; FIXME ;;;; ???
 	}
-
-	// ldr   r1,[r0.phase]
-	// add   r2,r1,#1
-	// and   r2,r2,r1,lsr#8
-	// and   r1,r1,#&FF00
-	// orr   r1,r1,r2
-	// str   r1,[r0.phase]         |* increment object phase *|
-
-	// r1 = obj.phase;
-	// r2 = r1 + 1;
-	// r2 = r2 & (r1 >> 8);
-	// r1 = r1 & 0xFF00;
-	// r1 = r1 | r2;
-	// obj.phase = r1;             |* increment object phase *|
 
 	// increment object phase
 	obj.phase = (obj.phase & 0xFF00) | ((obj.phase + 1) & (obj.phase >> 8))
@@ -988,45 +918,6 @@ func plot_pixel(X int, Y int, pixel uint8) {
 	}
 
 	screen.SetColorIndex(X, Y, pixel)
-
-	// Map the color yellow to this display (R=0xFF, G=0xFF, B=0x00)
-	// Note:  If the display is palettized, you must set the palette first.
-	//    pixel = sdl.MapRGB(screen.format, 0xFF, 0xFF, 0x00);
-
-	// Calculate the framebuffer offset of the center of the screen
-	// if screen.MustLock() {
-	// 	if err := screen.Lock(); err != nil {
-	// 		die("Couldn't lock screen: %v", err)
-	// 	}
-	// }
-	// bpp := screen.Format.BytesPerPixel
-	// FIXME bits := screen.Pixels()[Y*screen.Pitch+X*int(bpp)]
-
-	// Set the pixel
-	// switch bpp {
-	// case 1:
-	// 	// FIXME *((byte *)(bits)) = (byte)pixel;
-	// case 2:
-	// 	// FIXME *((Uint16 *)(bits)) = (Uint16)pixel;
-	// case 3:
-	// 	// Format/endian independent
-	// 	//var r, g, b byte
-
-	// 	// FIXME
-	// 	// r = (pixel >> screen.Format.Rshift) & 0xFF
-	// 	// g = (pixel >> screen.Format.Gshift) & 0xFF
-	// 	// b = (pixel >> screen.Format.Bshift) & 0xFF
-	// 	// *((bits)+screen.format.Rshift/8) = r;
-	// 	// *((bits)+screen.format.Gshift/8) = g;
-	// 	// *((bits)+screen.format.Bshift/8) = b;
-	// case 4:
-	// 	// FIXME *((uint *)(bits)) = (uint)pixel;
-	// }
-
-	// // Update the display
-	// if screen.MustLock() {
-	// 	screen.Unlock()
-	// }
 }
 
 // this plots the object whose address is in r0
@@ -1034,62 +925,8 @@ func plot(obj *object_block) {
 	hit = 0
 	collision = 0
 
-	// if true { // FIXME
-	// 	var rect sdl.Rect
-	// 	if obj.typ != dust {
-	// 		image := sprite[obj.typ+obj.state+(obj.phase&0xFF)]
-	// 		rect.X = obj.x >> pixelshift
-	// 		rect.Y = obj.y >> pixelshift
-	// 		rect.W = image.Rect.Dx()
-	// 		rect.H = image.Rect.Dy()
-
-	// 		texture, err := renderer.CreateTextureFromSurface(image)
-	// 		if err != nil {
-	// 			die("Create texture from surface error: %v", err)
-	// 		}
-	// 		defer texture.Destroy()
-
-	// 		renderer.Copy(texture, nil, &rect)
-
-	// 		// err := image.Blit(nil, screen, &rect)
-	// 		// if err != nil {
-	// 		// 	die("Blit surface error: %v", err)
-	// 		// }
-
-	// 		// TEST
-	// 		if (rand.Int() & 0xFF) == 0 {
-	// 			hit = 1
-	// 		}
-	// 		if (rand.Int() & 0xFF) == 0 {
-	// 			collision = 1
-	// 		}
-	// 	} else if obj.typ == dust {
-	// 		fade := (obj.life - time_now) >> 2
-	// 		fade = 15 - fade
-	// 		if fade > 15 {
-	// 			fade = 15
-	// 		}
-	// 		if fade < 0 {
-	// 			fade = 0
-	// 		}
-	// 		col := fade_colour_rgb[obj.state][fade]
-	// 		renderer.SetDrawColor(col.r, col.g, col.b, 255)
-	// 		x := obj.x >> pixelshift
-	// 		y := obj.y >> pixelshift
-	// 		renderer.FillRect(&sdl.Rect{x, y, 1, 1})
-	// 	}
-	// 	return // FIXME
-	// }
-
-	// Calculate the framebuffer offset of the center of the screen
-	// if screen.MustLock() {
-	// 	if err := screen.Lock(); err != nil {
-	// 		die("Couldn't lock screen: %v", err)
-	// 	}
-	// }
-	// bpp := screen.Format.BytesPerPixel
-	CLIP(&obj.x, SW<<pixelshift)
-	CLIP(&obj.y, SH<<pixelshift)
+	clip(&obj.x, SW<<pixelshift)
+	clip(&obj.y, SH<<pixelshift)
 	x := obj.x / (1 << pixelshift)
 	y := obj.y / (1 << pixelshift)
 	xpitch := 1
@@ -1105,15 +942,8 @@ func plot(obj *object_block) {
 		image := sprite[obj.typ+obj.state+(obj.phase&0xFF)]
 		psprite0 := int(0)
 
-		// XX--  0123
-		// XX--  4567
-
-		//        *pscreen0 = bullet_colour;
 		for yc := image.Rect.Dy() - 1; yc >= 0; yc-- {
 			psprite := psprite0
-
-			//            if (pscreen0 < screentop)
-			//                pscreen0 += screensize;
 			pscreen := pscreen0
 
 			for xc := image.Rect.Dx() - 1; xc >= 0; xc-- {
@@ -1178,11 +1008,6 @@ func plot(obj *object_block) {
 		}
 		screen.Pix[pscreen0] = fade_colour[obj.state][fade]
 	}
-
-	// // Update the display
-	// if screen.MustLock() {
-	// 	screen.Unlock()
-	// }
 }
 
 // This plots all the objects currently in the objects data structure
@@ -1272,6 +1097,9 @@ func readkeys() {
 		if !ghostship && pressed[sdl.SCANCODE_RETURN] != 0 {
 			fire()
 		}
+		if pressed[sdl.SCANCODE_S] != 0 {
+			writeImage(screen, "/tmp/screen.png")
+		}
 	}
 
 	spacepressed = pressed[sdl.SCANCODE_SPACE] != 0
@@ -1312,12 +1140,7 @@ func shipfriction() {
 func startupdate() {
 	start_update_time = get_ticks()
 
-	//bank = 3 - bank
-	// change logical bank
-	// update screenstart
-
 	// Clear the screen
-	//screen.FillRect(nil, 0)
 	renderer.SetDrawColor(0, 0, 0, 255)
 	renderer.Clear()
 
@@ -1329,10 +1152,6 @@ func startupdate() {
 
 // This should be called after modifying the screen
 func endupdate() {
-	// wait for Vsync
-	// change physical bank
-	// writeImage(screen, "/tmp/screen.png")
-
 	// super simple image conversion
 	for y := 0; y < screen.Rect.Dy(); y += 1 {
 		for x := 0; x < screen.Rect.Dx(); x += 1 {
@@ -1349,41 +1168,19 @@ func endupdate() {
 		}
 	}
 
-	// var rect sdl.Rect
-	// rect.X = 0
-	// rect.Y = 0
-	// rect.W = int32(screen.Rect.Dx())
-	// rect.H = int32(screen.Rect.Dy())
-
-	// texture, err := renderer.CreateTextureFromSurface(s)
-	// if err != nil {
-	// 	die("Create texture from surface error: %v", err)
-	// }
-	// defer texture.Destroy()
-
-	// renderer.Copy(texture, nil, &rect)
-
-	// Update all the changed bits
-	// sdl.UpdateRects(screen, 1, &rect)
-	// FIXME
-	// if err := screen.Flip(); err != nil {
-	// 	die("Problem with sdl.Flip: %v", err)
-	// }
+	// show the changes
 	renderer.Present()
 
 	// Make sure we aren't showing frames too quickly
 	plot_time := get_ticks() - start_update_time
 	pause_time := MIN_MS_PER_FRAME - plot_time
 	if pause_time > 0 {
-		//sdl.Delay(pause_time)
 		time.Sleep(time.Millisecond * time.Duration(pause_time)) // FIXME
 	}
 }
 
 // This resets the bank switching
-
 func resetbanks() {
-	// bank = 2
 	startupdate()
 	endupdate()
 }
