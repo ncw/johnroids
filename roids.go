@@ -46,20 +46,20 @@ import (
 const (
 	SW                  = 320
 	SH                  = 256
-	CHECK_PLOT          = true
+	check_plot          = true
 	pixelshift          = 8
 	logshipfriction     = 8
 	maxobjects          = 4096 // must be a power of two
 	maxsprites          = 64
-	MIN_MS_PER_FRAME    = 20
+	min_ms_per_frame    = 20
 	fade_colours        = 256
-	LOG_COS_TABLE_SCALE = 16
-	COS_TABLE_SCALE     = (1 << LOG_COS_TABLE_SCALE)
-	scale               = 3
+	log_cos_table_scale = 16
+	cos_table_scale     = (1 << log_cos_table_scale)
+	scale               = 3 // multiply the screen by this much
 )
 
 // structures
-type object_block struct {
+type object struct {
 	typ   int
 	state int
 	life  int // life in cs
@@ -71,6 +71,19 @@ type object_block struct {
 	lives int
 }
 
+// Clear the object
+func (obj *object) clear() {
+	obj.typ = 0
+	obj.state = 0
+	obj.phase = 0
+	obj.lives = 0
+	obj.life = 0
+	obj.dx = 0
+	obj.dy = 0
+	obj.x = 0
+	obj.y = 0
+}
+
 // static variables
 var (
 	screen       *image.Paletted
@@ -79,7 +92,7 @@ var (
 	renderer     *sdl.Renderer
 	sprite       [maxsprites]*image.Paletted
 
-	object [maxobjects]object_block
+	objects [maxobjects]object
 
 	fade_colour [fade_colours][16]uint8
 
@@ -106,11 +119,11 @@ var (
 	escapepressed bool
 	bullet_colour uint8
 
-	slives   = make([]*object_block, 5)
-	sscore   = make([]*object_block, 6)
-	shscore  = make([]*object_block, 6)
-	slevel   = make([]*object_block, 2)
-	sframems = make([]*object_block, 3)
+	slives   = make([]*object, 5)
+	sscore   = make([]*object, 6)
+	shscore  = make([]*object, 6)
+	slevel   = make([]*object, 2)
+	sframems = make([]*object, 3)
 
 	start_update_time int
 	plot_time         int // time it takes to plot a frame in ms
@@ -177,15 +190,15 @@ func screen_initialise() func() {
 
 // This finds a space in the objects, returning the address of that
 // space in r0, or 0 if there was no space
-func findspace() *object_block {
+func findspace() *object {
 	o := rand.Int() & (maxobjects - 1)
 	if o == 0 { // don't use the ship (first) slot
 		o++
 	}
 
 	for i := maxobjects - 10; i > 0; i-- { // try maxobjects-10 slots
-		if object[o].typ == 0 {
-			return &object[o]
+		if objects[o].typ == 0 {
+			return &objects[o]
 		}
 		o++
 		if o >= maxobjects {
@@ -197,28 +210,16 @@ func findspace() *object_block {
 	return nil
 }
 
-func clearobject(obj *object_block) {
-	obj.typ = 0
-	obj.state = 0
-	obj.phase = 0
-	obj.lives = 0
-	obj.life = 0
-	obj.dx = 0
-	obj.dy = 0
-	obj.x = 0
-	obj.y = 0
-}
-
 // This finds a space in the objects, returning the address of that
 // space in r0, or 0 if there was no space.
 // It also zeros all the entries in that object
-func findspacenzero() *object_block {
+func findspacenzero() *object {
 	obj := findspace()
 	if obj == nil {
 		return nil
 	}
 
-	clearobject(obj)
+	obj.clear()
 
 	return obj
 }
@@ -486,13 +487,13 @@ func init_vars() {
 	rand.Seed(time.Now().UTC().UnixNano())
 
 	for i := 0; i < 16; i++ {
-		cos_table[i] = int(COS_TABLE_SCALE*math.Cos(float64(i)/16*2*math.Pi) + 0.5)
-		sin_table[i] = int(COS_TABLE_SCALE*math.Sin(-float64(i)/16*2*math.Pi) + 0.5)
+		cos_table[i] = int(cos_table_scale*math.Cos(float64(i)/16*2*math.Pi) + 0.5)
+		sin_table[i] = int(cos_table_scale*math.Sin(-float64(i)/16*2*math.Pi) + 0.5)
 	}
 
 	for i := 0; i < 256; i++ {
-		cos_table2[i] = int(COS_TABLE_SCALE*math.Cos(float64(i)/256*2*math.Pi) + 0.5)
-		sin_table2[i] = int(COS_TABLE_SCALE*math.Sin(-float64(i)/256*2*math.Pi) + 0.5)
+		cos_table2[i] = int(cos_table_scale*math.Cos(float64(i)/256*2*math.Pi) + 0.5)
+		sin_table2[i] = int(cos_table_scale*math.Sin(-float64(i)/256*2*math.Pi) + 0.5)
 	}
 }
 
@@ -501,7 +502,7 @@ func init_vars() {
 // It removes any previous objects
 func setupobjects() {
 	for i := 0; i < maxobjects; i++ {
-		clearobject(&object[i])
+		objects[i].clear()
 	}
 
 	lives = 3
@@ -511,15 +512,15 @@ func setupobjects() {
 	level = 0
 	nroids = 0
 
-	object[0].typ = ship
-	object[0].state = 0
-	object[0].phase = 0
-	object[0].lives = 0
-	object[0].life = 0
-	object[0].dx = 0
-	object[0].dy = 0
-	object[0].x = (SW / 2) << pixelshift
-	object[0].y = (SH / 2) << pixelshift
+	objects[0].typ = ship
+	objects[0].state = 0
+	objects[0].phase = 0
+	objects[0].lives = 0
+	objects[0].life = 0
+	objects[0].dx = 0
+	objects[0].dy = 0
+	objects[0].x = (SW / 2) << pixelshift
+	objects[0].y = (SH / 2) << pixelshift
 
 	obj := findspacenzero()
 	obj.typ = scoreword
@@ -587,7 +588,7 @@ func setupobjects() {
 // This converts the number in r0, into r1 decimal digits, putting
 // the results into the objects pointed to by the array of pointers pointed
 // to by r2
-func makedigits(n int, output []*object_block) {
+func makedigits(n int, output []*object) {
 	digitbuffer := fmt.Sprintf("%0*d", len(output), n)
 	for i, c := range digitbuffer {
 		output[i].state = int(c - '0')
@@ -595,7 +596,7 @@ func makedigits(n int, output []*object_block) {
 }
 
 // This fires a bullet from a roid, pointed to in r0
-func roidfire(parent *object_block) {
+func roidfire(parent *object) {
 	weapon := findspace()
 
 	weapon.typ = roid
@@ -607,8 +608,8 @@ func roidfire(parent *object_block) {
 	weapon.y = parent.y
 
 	// calculate a trajectory to fire at the ship
-	dx := object[0].x - weapon.x
-	dy := object[0].y - weapon.y
+	dx := objects[0].x - weapon.x
+	dy := objects[0].y - weapon.y
 	abs_dx := dx
 	if dx < 0 {
 		abs_dx = -dx
@@ -638,7 +639,7 @@ func roidfire(parent *object_block) {
 
 // return the current ship direction
 func ship_direction() int {
-	return object[0].state
+	return objects[0].state
 }
 
 // This fires a bullet from the ship
@@ -657,10 +658,10 @@ func fire() {
 
 	obj.life = time_now + 200
 
-	x := object[0].x
-	y := object[0].y
-	dx := object[0].dx
-	dy := object[0].dy
+	x := objects[0].x
+	y := objects[0].y
+	dx := objects[0].dx
+	dy := objects[0].dy
 
 	c := cos_table[ship_direction()]
 	s := sin_table[ship_direction()]
@@ -684,7 +685,7 @@ func fire() {
 
 // This blows up the roid pointed to by r0 into 2 smaller bits
 // or into nothing, depending on size
-func blowroid(r *object_block, x int, y int) {
+func blowroid(r *object, x int, y int) {
 	score += r.state * 10
 
 	if r.state > roid_endsplit {
@@ -734,7 +735,7 @@ func blowroid(r *object_block, x int, y int) {
 
 // This explodes an object into its component pixels with a blast centre
 // of (x,y).  Use (-1,-1) to use the centre of the object.
-func explode_object(obj *object_block, x int, y int, particles int, mean_speed int, speed_mask int, life_mask int) {
+func explode_object(obj *object, x int, y int, particles int, mean_speed int, speed_mask int, life_mask int) {
 	image := sprite[obj.typ+obj.state+(obj.phase&0xFF)]
 	//      int dx = obj.dx;
 	//      int dy = obj.dy;
@@ -761,8 +762,8 @@ func explode_object(obj *object_block, x int, y int, particles int, mean_speed i
 				if speed_mask != 0 {
 					speed -= (rand.Int() & speed_mask)
 				}
-				//p.dx = dx + ( cos_table2[angle >> 8] * speed ) / COS_TABLE_SCALE;
-				//p.dy = dy + ( sin_table2[angle >> 8] * speed ) / COS_TABLE_SCALE;
+				//p.dx = dx + ( cos_table2[angle >> 8] * speed ) / cos_table_scale;
+				//p.dy = dy + ( sin_table2[angle >> 8] * speed ) / cos_table_scale;
 				//p.dx = dx + (rand.Int() & 0xFF) - 0x80;
 				//p.dy = dy + (rand.Int() & 0xFF) - 0x80;
 				p.dx = obj.dx + (i << (pixelshift - 3)) - (image.Rect.Dx() << (pixelshift - 4))
@@ -776,7 +777,7 @@ func explode_object(obj *object_block, x int, y int, particles int, mean_speed i
 // This makes an explosion at the object pointed to by r0
 // with r1 particles, of colour_row r2, or random if r2<0
 // r3 is used to mask centi-seconds of life
-func explosion(obj *object_block, x int, y int, particles int, mean_speed int, speed_mask int, colour_row int, life_mask int) {
+func explosion(obj *object, x int, y int, particles int, mean_speed int, speed_mask int, colour_row int, life_mask int) {
 	image := sprite[obj.typ+obj.state+(obj.phase&0xFF)]
 	dx := obj.dx
 	dy := obj.dy
@@ -807,8 +808,8 @@ func explosion(obj *object_block, x int, y int, particles int, mean_speed int, s
 		if speed_mask != 0 {
 			speed -= (rand.Int() & speed_mask)
 		}
-		p.dx = dx + (cos_table2[angle>>8]*speed)/COS_TABLE_SCALE
-		p.dy = dy + (sin_table2[angle>>8]*speed)/COS_TABLE_SCALE
+		p.dx = dx + (cos_table2[angle>>8]*speed)/cos_table_scale
+		p.dy = dy + (sin_table2[angle>>8]*speed)/cos_table_scale
 		// p.dx = dx + (rand.Int() & 0xFF) - 0x80;
 		// p.dy = dy + (rand.Int() & 0xFF) - 0x80;
 	}
@@ -817,20 +818,20 @@ func explosion(obj *object_block, x int, y int, particles int, mean_speed int, s
 // This blows up the ship
 func blowship(x int, y int) {
 	// sound_blowship()
-	explode_object(&object[0], x, y, 64, 0x100, 0x7F, 0x1FF)
-	explosion(&object[0], x, y, 64, 0x80, 0x1F, -1, 0x1FF)
-	object[0].typ = 0
+	explode_object(&objects[0], x, y, 64, 0x100, 0x7F, 0x1FF)
+	explosion(&objects[0], x, y, 64, 0x80, 0x1F, -1, 0x1FF)
+	objects[0].typ = 0
 }
 
 // This explodes a bullet that has hit, or is time expired
-func bulletexplosion(obj *object_block) {
+func bulletexplosion(obj *object) {
 	explode_object(obj, -1, -1, 8, 0x20, 0x00, 0x7F)
 	//    explosion(obj, 8, 0x20, 0x00, bullet_colour, 0x7F);
 	// sound_bulletexplosion();
 }
 
 // This explodes a roid
-func roidexplosion(obj *object_block, x int, y int) {
+func roidexplosion(obj *object, x int, y int) {
 	//    explode_object(obj, x, y, 32, 0x80, 0x7F, 0xFF);
 	explosion(obj, x, y, 32, 0x80, 0x7F, rand.Int()%fade_colours, 0xFF)
 	// sound_roidexplosion();
@@ -847,7 +848,7 @@ func clip(z *int, w int) {
 }
 
 // This updates the co-ordinates of the object in r0 co-ordinates
-func update(obj *object_block) {
+func update(obj *object) {
 	sy := obj.y
 	sx := obj.x
 
@@ -873,7 +874,7 @@ func update(obj *object_block) {
 	obj.phase = (obj.phase & 0xFF00) | ((obj.phase + 1) & (obj.phase >> 8))
 
 	// if ship is dead, don't do the below
-	if object[0].typ != ship {
+	if objects[0].typ != ship {
 		return
 	}
 
@@ -885,19 +886,19 @@ func update(obj *object_block) {
 		dy := obj.dy
 
 		dx -= (dx / (1 << 10))
-		if object[0].x > obj.x {
+		if objects[0].x > obj.x {
 			dx += 4
 		}
-		if object[0].x < obj.x {
+		if objects[0].x < obj.x {
 			dx -= 4
 		}
 		obj.dx = dx
 
 		dy -= (dy / (1 << 10))
-		if object[0].y > obj.y {
+		if objects[0].y > obj.y {
 			dy += 4
 		}
-		if object[0].y < obj.y {
+		if objects[0].y < obj.y {
 			dy -= 4
 		}
 		obj.dy = dy
@@ -921,7 +922,7 @@ func plot_pixel(X int, Y int, pixel uint8) {
 }
 
 // this plots the object whose address is in r0
-func plot(obj *object_block) {
+func plot(obj *object) {
 	hit = 0
 	collision = 0
 
@@ -950,7 +951,7 @@ func plot(obj *object_block) {
 				if pscreen >= screenbot {
 					pscreen -= screensize
 				}
-				if CHECK_PLOT {
+				if check_plot {
 					if pscreen < screentop || pscreen >= screenbot {
 						die("Attempt to plot sprite out of screen at %p start %p end %p\n", pscreen, screentop, screenbot)
 					}
@@ -1001,7 +1002,7 @@ func plot(obj *object_block) {
 		if fade < 0 {
 			fade = 0
 		}
-		if CHECK_PLOT {
+		if check_plot {
 			if pscreen0 < screentop || pscreen0 >= screenbot {
 				die("Attempt to plot dust off screen at %p start %p end %p", pscreen0, screentop, screenbot)
 			}
@@ -1015,7 +1016,7 @@ func plot(obj *object_block) {
 func plotobjects() {
 	// first plot the bullets, and update everything
 	for i := 0; i < maxobjects; i++ {
-		obj := &object[i]
+		obj := &objects[i]
 		if obj.typ != 0 {
 			update(obj)
 			if obj.typ == bullet {
@@ -1026,7 +1027,7 @@ func plotobjects() {
 
 	// now plot the roids
 	for i := 0; i < maxobjects; i++ {
-		obj := &object[i]
+		obj := &objects[i]
 		if obj.typ == roid {
 			plot(obj)
 			if hit != 0 {
@@ -1036,8 +1037,8 @@ func plotobjects() {
 	}
 
 	// now plot the ship
-	if object[0].typ == ship {
-		plot(&object[0])
+	if objects[0].typ == ship {
+		plot(&objects[0])
 
 		if !ghostship && collision != 0 {
 			blowship(collision_x, collision_y)
@@ -1046,7 +1047,7 @@ func plotobjects() {
 
 	// now plot the bullets again
 	for i := 0; i < maxobjects; i++ {
-		obj := &object[i]
+		obj := &objects[i]
 		if obj.typ == bullet {
 			plot(obj)
 			if collision != 0 {
@@ -1058,7 +1059,7 @@ func plotobjects() {
 
 	// now plot the pretty objects (dust, score etc)
 	for i := 0; i < maxobjects; i++ {
-		obj := &object[i]
+		obj := &objects[i]
 		if obj.typ >= pretty {
 			plot(obj)
 		}
@@ -1081,18 +1082,18 @@ func readkeys() {
 	pressed := sdl.GetKeyboardState()
 
 	// if ship is dead, no need to read action keys
-	if object[0].typ != 0 {
+	if objects[0].typ != 0 {
 		if pressed[sdl.SCANCODE_Z] != 0 {
-			object[0].state = (ship_direction() + 1) & 0xF
+			objects[0].state = (ship_direction() + 1) & 0xF
 		}
 		if pressed[sdl.SCANCODE_X] != 0 {
-			object[0].state = (ship_direction() - 1) & 0xF
+			objects[0].state = (ship_direction() - 1) & 0xF
 		}
 		if pressed[sdl.SCANCODE_RSHIFT] != 0 || pressed[sdl.SCANCODE_LSHIFT] != 0 {
 			c := cos_table[ship_direction()]
 			s := sin_table[ship_direction()]
-			object[0].dx += c / (1 << (18 - pixelshift))
-			object[0].dy += s / (1 << (18 - pixelshift))
+			objects[0].dx += c / (1 << (18 - pixelshift))
+			objects[0].dy += s / (1 << (18 - pixelshift))
 		}
 		if !ghostship && pressed[sdl.SCANCODE_RETURN] != 0 {
 			fire()
@@ -1113,8 +1114,8 @@ func readkeys() {
 // Slow the ship down due to friction - unphysical but makes the game
 // playable
 func shipfriction() {
-	dx := object[0].dx
-	dy := object[0].dy
+	dx := objects[0].dx
+	dy := objects[0].dy
 
 	dx -= dx / (1 << logshipfriction)
 	if dx < 0 {
@@ -1132,8 +1133,8 @@ func shipfriction() {
 		dy -= 1
 	}
 
-	object[0].dx = dx
-	object[0].dy = dy
+	objects[0].dx = dx
+	objects[0].dy = dy
 }
 
 // This should be called after modifying the screen
@@ -1173,7 +1174,7 @@ func endupdate() {
 
 	// Make sure we aren't showing frames too quickly
 	plot_time := get_ticks() - start_update_time
-	pause_time := MIN_MS_PER_FRAME - plot_time
+	pause_time := min_ms_per_frame - plot_time
 	if pause_time > 0 {
 		time.Sleep(time.Millisecond * time.Duration(pause_time)) // FIXME
 	}
@@ -1244,11 +1245,11 @@ func lifelost() {
 	ghostship = true
 
 	// reset the ship
-	object[0].typ = ship
-	object[0].dx = 0
-	object[0].dy = 0
-	object[0].x = (SW / 2) << pixelshift
-	object[0].y = (SH / 2) << pixelshift
+	objects[0].typ = ship
+	objects[0].dx = 0
+	objects[0].dy = 0
+	objects[0].x = (SW / 2) << pixelshift
+	objects[0].y = (SH / 2) << pixelshift
 
 	obj := findspacenzero()
 	obj.typ = numbers
@@ -1256,8 +1257,8 @@ func lifelost() {
 	// Count down the time to go
 	end_time := time_now + 5*64 - 4
 	for time_now-end_time < 0 {
-		obj.x = object[0].x - (8 << pixelshift)
-		obj.y = object[0].y - (8 << pixelshift)
+		obj.x = objects[0].x - (8 << pixelshift)
+		obj.y = objects[0].y - (8 << pixelshift)
 		obj.state = (((end_time - time_now) >> 6) + 1) & 7
 		plotframe()
 	}
@@ -1348,7 +1349,7 @@ func main() {
 
 			// main loop
 			for lives >= 0 && nroids != 0 {
-				if object[0].typ != ship {
+				if objects[0].typ != ship {
 					lifelost()
 				}
 				plotframe()
