@@ -1,6 +1,13 @@
 package main
 
-import "github.com/veandco/go-sdl2/sdl"
+import (
+	"flag"
+	"log"
+	"os"
+	"runtime/pprof"
+
+	"github.com/veandco/go-sdl2/sdl"
+)
 
 // Globals
 var (
@@ -38,9 +45,22 @@ func screen_initialise() func() {
 	}
 }
 
+var cpuprofile = flag.String("cpuprofile", "", "write cpu profile to file")
+
 func main() {
 	defer screen_initialise()()
+	flag.Parse()
+	if *cpuprofile != "" {
+		f, err := os.Create(*cpuprofile)
+		if err != nil {
+			log.Fatal(err)
+		}
+		pprof.StartCPUProfile(f)
+		defer pprof.StopCPUProfile()
+	}
 	g := New()
-	g.main()
+	for {
+		g.frame()
+	}
 	// FIXME render
 }

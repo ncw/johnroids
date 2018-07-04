@@ -91,6 +91,7 @@ type Game struct {
 	foundPalette map[rgba]uint8
 	sprite       [maxsprites]*image.Paletted
 	objects      [maxobjects]object
+	funcStack    []func()
 
 	fade_colour [fade_colours][16]uint8
 
@@ -148,7 +149,27 @@ func New() *Game {
 	g.init_vars()
 	g.resetbanks()
 	g.time_now = read_time()
+	g.push(g.newGame)
 	return g
+}
+
+// Push functions on the execution stack.
+//
+// If more than one function is supplied, eg g.push(fn1, fn2) these
+// are executed in the order fn(1), fn(2)
+func (g *Game) push(fns ...func()) {
+	for i := range fns {
+		g.funcStack = append(g.funcStack, fns[len(fns)-1-i])
+	}
+}
+
+// Pop a single function from the stack, returns nil if not found
+func (g *Game) pop() (fn func()) {
+	if len(g.funcStack) == 0 {
+		return nil
+	}
+	fn, g.funcStack = g.funcStack[len(g.funcStack)-1], g.funcStack[:len(g.funcStack)-1]
+	return fn
 }
 
 // Write some debug stuff
@@ -1157,8 +1178,8 @@ func (g *Game) endupdate() {
 	renderer.Present()
 
 	// Make sure we aren't showing frames too quickly
-	plot_time := get_ticks() - g.start_update_time
-	pause_time := min_ms_per_frame - plot_time
+	g.plot_time = get_ticks() - g.start_update_time
+	pause_time := min_ms_per_frame - g.plot_time
 	if pause_time > 0 {
 		time.Sleep(time.Millisecond * time.Duration(pause_time)) // FIXME
 	}
@@ -1193,12 +1214,13 @@ func (g *Game) plotframe() {
 	g.shipfriction()
 }
 
-// This plots the game objects for r0 centi-seconds before returning control
-func (g *Game) gamepause(pause int) {
+// This returns a function which will pause the game for pause centi-seconds
+func (g *Game) gamepause(pause int) (fn func()) {
 	end_time := g.time_now + pause
-
-	for g.time_now-end_time < 0 {
-		g.plotframe()
+	return func() {
+		if g.time_now-end_time < 0 {
+			g.push(fn)
+		}
 	}
 }
 
@@ -1210,9 +1232,12 @@ func (g *Game) gameover() {
 	obj.y = (SH - g.sprite[g.gameoverword].Rect.Dy()) << (pixelshift - 1)
 	obj.typ = g.gameoverword
 
-	g.gamepause(500)
-
-	obj.typ = 0
+	g.push(
+		g.gamepause(500),
+		func() {
+			obj.typ = 0
+		},
+	)
 }
 
 // This is run when a life has been lost, and it is necessary to
@@ -1225,30 +1250,39 @@ func (g *Game) lifelost() {
 		return
 	}
 
-	g.gamepause(300)
-	g.ghostship = true
+	fn := func() {
+		g.ghostship = true
 
-	// reset the ship
-	g.objects[0].typ = g.ship
-	g.objects[0].dx = 0
-	g.objects[0].dy = 0
-	g.objects[0].x = (SW / 2) << pixelshift
-	g.objects[0].y = (SH / 2) << pixelshift
+		// reset the ship
+		g.objects[0].typ = g.ship
+		g.objects[0].dx = 0
+		g.objects[0].dy = 0
+		g.objects[0].x = (SW / 2) << pixelshift
+		g.objects[0].y = (SH / 2) << pixelshift
 
-	obj := g.findspacenzero()
-	obj.typ = g.numbers
+		obj := g.findspacenzero()
+		obj.typ = g.numbers
 
-	// Count down the time to go
-	end_time := g.time_now + 5*64 - 4
-	for g.time_now-end_time < 0 {
-		obj.x = g.objects[0].x - (8 << pixelshift)
-		obj.y = g.objects[0].y - (8 << pixelshift)
-		obj.state = (((end_time - g.time_now) >> 6) + 1) & 7
-		g.plotframe()
+		// Count down the time to go
+		end_time := g.time_now + 5*64 - 4
+		var fn2 func()
+		fn2 = func() {
+			if g.time_now-end_time < 0 {
+				obj.x = g.objects[0].x - (8 << pixelshift)
+				obj.y = g.objects[0].y - (8 << pixelshift)
+				obj.state = (((end_time - g.time_now) >> 6) + 1) & 7
+				g.push(fn2)
+			} else {
+				obj.typ = 0
+				g.ghostship = false
+			}
+		}
+		fn2()
 	}
-
-	obj.typ = 0
-	g.ghostship = false
+	g.push(
+		g.gamepause(300),
+		fn,
+	)
 }
 
 // This shows the instructions on the screen, and returns control when
@@ -1261,15 +1295,16 @@ func (g *Game) showinstructions() {
 
 	g.ghostship = true
 
-	for {
-		g.plotframe()
+	var fn func()
+	fn = func() {
 		if g.spacepressed {
-			break
+			obj.typ = 0
+			g.ghostship = false
+		} else {
+			g.push(fn)
 		}
 	}
-
-	obj.typ = 0
-	g.ghostship = false
+	fn()
 }
 
 // This generates a new roid with random position, not too close to the
@@ -1302,36 +1337,56 @@ func (g *Game) makeroid() {
 	obj.typ = g.roid
 }
 
-func (g *Game) main() {
-	// new game
-	for {
-		g.setupobjects()
-		g.makeroid()
-		g.showinstructions()
-		g.setupobjects()
+func (g *Game) newGame() {
+	g.push(
+		g.setupobjects,
+		g.newLevel,
+		g.gameover,
+		g.newGame,
+	)
+	g.setupobjects()
+	g.makeroid()
+	g.showinstructions()
+	debugf("stack2 = %+v", g.funcStack)
+}
 
-		// new level
-		for g.lives >= 0 {
-
-			g.level++
-			if g.level != 0 {
-				g.gamepause(300)
-			}
-
-			g.makedigits(g.level, g.slevel)
-
-			for i := g.level + 1; i > 0; i-- {
-				g.makeroid()
-			}
-
-			// main loop
-			for g.lives >= 0 && g.nroids != 0 {
-				if g.objects[0].typ != g.ship {
-					g.lifelost()
+func (g *Game) newLevel() {
+	if g.lives >= 0 {
+		g.push(
+			func() {
+				g.level++
+				if g.level != 0 {
+					g.push(g.gamepause(300))
 				}
-				g.plotframe()
-			}
-		}
-		g.gameover()
+			},
+			func() {
+				g.makedigits(g.level, g.slevel)
+				for i := g.level + 1; i > 0; i-- {
+					g.makeroid()
+				}
+			},
+			g.gameLoop,
+		)
 	}
+}
+
+func (g *Game) gameLoop() {
+	if g.lives >= 0 && g.nroids != 0 {
+		g.push(g.gameLoop)
+		if g.objects[0].typ != g.ship {
+			g.lifelost()
+		}
+	} else {
+		g.newLevel()
+	}
+}
+
+// This plots a single frame of the game
+func (g *Game) frame() {
+	fn := g.pop()
+	if fn == nil {
+		die("No functions on stack")
+	}
+	fn()
+	g.plotframe()
 }
