@@ -2,6 +2,8 @@ package main
 
 import (
 	"flag"
+	"fmt"
+	"image/color"
 	"log"
 	"os"
 	"runtime/pprof"
@@ -45,6 +47,34 @@ func screen_initialise() func() {
 	}
 }
 
+// Read the keys
+func readEvents(g *Game) {
+	event := sdl.PollEvent()
+	switch x := event.(type) {
+	case nil:
+	case *sdl.KeyboardEvent:
+		pressed := x.State != 0
+		switch x.Keysym.Scancode {
+		case sdl.SCANCODE_Z:
+			g.KeyEvent(KeyCodeZ, pressed)
+		case sdl.SCANCODE_X:
+			g.KeyEvent(KeyCodeX, pressed)
+		case sdl.SCANCODE_RSHIFT, sdl.SCANCODE_LSHIFT:
+			g.KeyEvent(KeyCodeShift, pressed)
+		case sdl.SCANCODE_RETURN:
+			g.KeyEvent(KeyCodeReturn, pressed)
+		case sdl.SCANCODE_SPACE:
+			g.KeyEvent(KeyCodeSpace, pressed)
+		case sdl.SCANCODE_ESCAPE:
+			fmt.Printf("Escape pressed - bye\n")
+			os.Exit(0)
+		}
+	case *sdl.QuitEvent:
+		fmt.Printf("SDL quit received - bye\n")
+		os.Exit(0)
+	}
+}
+
 var cpuprofile = flag.String("cpuprofile", "", "write cpu profile to file")
 
 func main() {
@@ -60,7 +90,32 @@ func main() {
 	}
 	g := New()
 	for {
-		g.frame()
+		readEvents(g)
+		screen := g.frame()
+
+		// Clear the screen
+		renderer.SetDrawColor(0, 0, 0, 255)
+		renderer.Clear()
+
+		// super simple image conversion
+		for y := 0; y < screen.Rect.Dy(); y += 1 {
+			for x := 0; x < screen.Rect.Dx(); x += 1 {
+				c := screen.ColorIndexAt(x, y)
+				if c != 0 {
+					if int(c) >= len(g.palette) {
+						debugf("color out of range %d/%d", c, len(g.palette))
+						c = uint8(len(g.palette) - 1)
+					}
+					cc := screen.Palette[c].(color.RGBA)
+					renderer.SetDrawColor(cc.R, cc.G, cc.B, cc.A)
+					renderer.DrawPoint(int32(x), int32(y))
+				}
+			}
+		}
+
+		// show the changes
+		renderer.Present()
+
 	}
 	// FIXME render
 }

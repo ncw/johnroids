@@ -39,8 +39,6 @@ import (
 	"math/rand"
 	"os"
 	"time"
-
-	"github.com/veandco/go-sdl2/sdl"
 )
 
 const (
@@ -93,6 +91,13 @@ type Game struct {
 	objects      [maxobjects]object
 	funcStack    []func()
 
+	// Keys
+	keyZ      bool
+	keyX      bool
+	keyShift  bool
+	keyReturn bool
+	keySpace  bool
+
 	fade_colour [fade_colours][16]uint8
 
 	time_now      int
@@ -114,8 +119,6 @@ type Game struct {
 	score         int
 	hscore        int
 	ghostship     bool
-	spacepressed  bool
-	escapepressed bool
 	bullet_colour uint8
 
 	slives   []*object
@@ -1071,48 +1074,64 @@ func (g *Game) plotobjects() {
 	}
 }
 
+// KeyCode defines keys to pass to Game.KeyEvent
+type KeyCode byte
+
+// Keys that need to be passed to Game.KeyEvent
+const (
+	KeyCodeZ KeyCode = iota
+	KeyCodeX
+	KeyCodeShift
+	KeyCodeReturn
+	KeyCodeSpace
+)
+
+// Key event should be used to deliver key presses to the game.
+//
+// key should be one of the define KeyCodes and pressed should be true
+// for key depressed and false for key released
+func (g *Game) KeyEvent(key KeyCode, pressed bool) {
+	switch key {
+	case KeyCodeZ:
+		g.keyZ = pressed
+	case KeyCodeX:
+		g.keyX = pressed
+	case KeyCodeShift:
+		g.keyShift = pressed
+	case KeyCodeReturn:
+		g.keyReturn = pressed
+	case KeyCodeSpace:
+		g.keySpace = pressed
+	default:
+		debugf("Unknown key %v", key)
+	}
+}
+
 // Read the keys
 func (g *Game) readkeys() {
-	event := sdl.PollEvent()
-	if event != nil && event.GetType() == sdl.QUIT {
-		fmt.Printf("SDL quit received - bye\n")
-		os.Exit(0)
-	}
-
+	// don't read keys too often
 	if g.time_now-g.key_time < 0 {
 		return
-	} // don't read keys too often
+	}
 	g.key_time += 5
-
-	pressed := sdl.GetKeyboardState()
 
 	// if ship is dead, no need to read action keys
 	if g.objects[0].typ != 0 {
-		if pressed[sdl.SCANCODE_Z] != 0 {
+		if g.keyZ {
 			g.objects[0].state = (g.ship_direction() + 1) & 0xF
 		}
-		if pressed[sdl.SCANCODE_X] != 0 {
+		if g.keyX {
 			g.objects[0].state = (g.ship_direction() - 1) & 0xF
 		}
-		if pressed[sdl.SCANCODE_RSHIFT] != 0 || pressed[sdl.SCANCODE_LSHIFT] != 0 {
+		if g.keyShift {
 			c := g.cos_table[g.ship_direction()]
 			s := g.sin_table[g.ship_direction()]
 			g.objects[0].dx += c / (1 << (18 - pixelshift))
 			g.objects[0].dy += s / (1 << (18 - pixelshift))
 		}
-		if !g.ghostship && pressed[sdl.SCANCODE_RETURN] != 0 {
+		if !g.ghostship && g.keyReturn {
 			g.fire()
 		}
-		if pressed[sdl.SCANCODE_S] != 0 {
-			writeImage(g.screen, "/tmp/screen.png")
-		}
-	}
-
-	g.spacepressed = pressed[sdl.SCANCODE_SPACE] != 0
-
-	if pressed[sdl.SCANCODE_ESCAPE] != 0 {
-		fmt.Printf("Escape pressed - bye\n")
-		os.Exit(0)
 	}
 }
 
@@ -1146,10 +1165,6 @@ func (g *Game) shipfriction() {
 func (g *Game) startupdate() {
 	g.start_update_time = get_ticks()
 
-	// Clear the screen
-	renderer.SetDrawColor(0, 0, 0, 255)
-	renderer.Clear()
-
 	// Clear the screen to black
 	for i := range g.screen.Pix {
 		g.screen.Pix[i] = 0
@@ -1158,25 +1173,6 @@ func (g *Game) startupdate() {
 
 // This should be called after modifying the screen
 func (g *Game) endupdate() {
-	// super simple image conversion
-	for y := 0; y < g.screen.Rect.Dy(); y += 1 {
-		for x := 0; x < g.screen.Rect.Dx(); x += 1 {
-			c := g.screen.ColorIndexAt(x, y)
-			if c != 0 {
-				if int(c) >= len(g.palette) {
-					debugf("color out of range %d/%d", c, len(g.palette))
-					c = uint8(len(g.palette) - 1)
-				}
-				cc := g.palette[c].(color.RGBA)
-				renderer.SetDrawColor(cc.R, cc.G, cc.B, cc.A)
-				renderer.DrawPoint(int32(x), int32(y))
-			}
-		}
-	}
-
-	// show the changes
-	renderer.Present()
-
 	// Make sure we aren't showing frames too quickly
 	g.plot_time = get_ticks() - g.start_update_time
 	pause_time := min_ms_per_frame - g.plot_time
@@ -1297,7 +1293,7 @@ func (g *Game) showinstructions() {
 
 	var fn func()
 	fn = func() {
-		if g.spacepressed {
+		if g.keySpace {
 			obj.typ = 0
 			g.ghostship = false
 		} else {
@@ -1347,7 +1343,6 @@ func (g *Game) newGame() {
 	g.setupobjects()
 	g.makeroid()
 	g.showinstructions()
-	debugf("stack2 = %+v", g.funcStack)
 }
 
 func (g *Game) newLevel() {
@@ -1382,11 +1377,12 @@ func (g *Game) gameLoop() {
 }
 
 // This plots a single frame of the game
-func (g *Game) frame() {
+func (g *Game) frame() *image.Paletted {
 	fn := g.pop()
 	if fn == nil {
 		die("No functions on stack")
 	}
 	fn()
 	g.plotframe()
+	return g.screen
 }
