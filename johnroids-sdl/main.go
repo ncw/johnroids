@@ -1,3 +1,4 @@
+// SDL version of johnroids
 package main
 
 import (
@@ -8,7 +9,13 @@ import (
 	"os"
 	"runtime/pprof"
 
+	"github.com/ncw/johnroids"
 	"github.com/veandco/go-sdl2/sdl"
+)
+
+// Constants
+const (
+	scale = 3 // multiply the screen by this much
 )
 
 // Globals
@@ -20,23 +27,23 @@ var (
 func screen_initialise() func() {
 	// Initialize the SDL library
 	if err := sdl.Init(sdl.INIT_VIDEO); err != nil {
-		die("Couldn't initialize SDL: %v", err)
+		log.Fatalf("Couldn't initialize SDL: %v", err)
 	}
 
-	window, err := sdl.CreateWindow("JohnRoids", sdl.WINDOWPOS_UNDEFINED, sdl.WINDOWPOS_UNDEFINED, SW*scale, SH*scale, sdl.WINDOW_SHOWN)
+	window, err := sdl.CreateWindow("JohnRoids", sdl.WINDOWPOS_UNDEFINED, sdl.WINDOWPOS_UNDEFINED, johnroids.SW*scale, johnroids.SH*scale, sdl.WINDOW_SHOWN)
 	if err != nil {
 		panic(err)
 	}
 
 	renderer, err = sdl.CreateRenderer(window, -1, sdl.RENDERER_ACCELERATED)
 	if err != nil {
-		die("Couldn't initialize renderer: %v", err)
+		log.Fatalf("Couldn't initialize renderer: %v", err)
 	}
 	renderer.SetScale(scale, scale)
 
 	surface, err := window.GetSurface()
 	if err != nil {
-		die("Couldn't initialize surface: %v", err)
+		log.Fatalf("Couldn't initialize surface: %v", err)
 	}
 	surface.FillRect(nil, 0)
 
@@ -48,7 +55,7 @@ func screen_initialise() func() {
 }
 
 // Read the keys
-func readEvents(g *Game) {
+func readEvents(g *johnroids.Game) {
 	event := sdl.PollEvent()
 	switch x := event.(type) {
 	case nil:
@@ -56,15 +63,15 @@ func readEvents(g *Game) {
 		pressed := x.State != 0
 		switch x.Keysym.Scancode {
 		case sdl.SCANCODE_Z:
-			g.KeyEvent(KeyCodeZ, pressed)
+			g.KeyEvent(johnroids.KeyCodeZ, pressed)
 		case sdl.SCANCODE_X:
-			g.KeyEvent(KeyCodeX, pressed)
+			g.KeyEvent(johnroids.KeyCodeX, pressed)
 		case sdl.SCANCODE_RSHIFT, sdl.SCANCODE_LSHIFT:
-			g.KeyEvent(KeyCodeShift, pressed)
+			g.KeyEvent(johnroids.KeyCodeShift, pressed)
 		case sdl.SCANCODE_RETURN:
-			g.KeyEvent(KeyCodeReturn, pressed)
+			g.KeyEvent(johnroids.KeyCodeReturn, pressed)
 		case sdl.SCANCODE_SPACE:
-			g.KeyEvent(KeyCodeSpace, pressed)
+			g.KeyEvent(johnroids.KeyCodeSpace, pressed)
 		case sdl.SCANCODE_ESCAPE:
 			fmt.Printf("Escape pressed - bye\n")
 			os.Exit(0)
@@ -88,10 +95,10 @@ func main() {
 		pprof.StartCPUProfile(f)
 		defer pprof.StopCPUProfile()
 	}
-	g := New()
+	g := johnroids.New()
 	for {
 		readEvents(g)
-		screen := g.frame()
+		screen := g.Frame()
 
 		// Clear the screen
 		renderer.SetDrawColor(0, 0, 0, 255)
@@ -102,9 +109,9 @@ func main() {
 			for x := 0; x < screen.Rect.Dx(); x += 1 {
 				c := screen.ColorIndexAt(x, y)
 				if c != 0 {
-					if int(c) >= len(g.palette) {
-						debugf("color out of range %d/%d", c, len(g.palette))
-						c = uint8(len(g.palette) - 1)
+					if int(c) >= len(screen.Palette) {
+						log.Printf("color out of range %d/%d", c, len(screen.Palette))
+						c = uint8(len(screen.Palette) - 1)
 					}
 					cc := screen.Palette[c].(color.RGBA)
 					renderer.SetDrawColor(cc.R, cc.G, cc.B, cc.A)

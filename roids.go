@@ -28,10 +28,10 @@ the roids so that the bits always came apart from the centre.
 Could make the explosion always start from the bullet hit - this might
 be quite realistic.
 */
-package main
+package johnroids
 
 // Create bindata.go to embed the images
-//go:generate go-bindata -nometadata -nocompress images
+//go:generate go-bindata -nometadata -nocompress -pkg johnroids images
 
 import (
 	"bytes"
@@ -57,7 +57,6 @@ const (
 	fade_colours        = 256
 	log_cos_table_scale = 16
 	cos_table_scale     = (1 << log_cos_table_scale)
-	scale               = 3 // multiply the screen by this much
 )
 
 // structures
@@ -1383,7 +1382,7 @@ func (g *Game) gameLoop() {
 }
 
 // This plots a single frame of the game
-func (g *Game) frame() *image.Paletted {
+func (g *Game) Frame() *image.Paletted {
 	fn := g.pop()
 	if fn == nil {
 		die("No functions on stack")

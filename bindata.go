@@ -64,7 +64,7 @@
 // images/weapon3.png
 // DO NOT EDIT!
 
-package main
+package johnroids
 
 import (
 	"fmt"
