@@ -30,7 +30,11 @@ be quite realistic.
 */
 package main
 
+// Create bindata.go to embed the images
+//go:generate go-bindata -nometadata -nocompress images
+
 import (
+	"bytes"
 	"fmt"
 	"image"
 	"image/color"
@@ -356,13 +360,15 @@ func (g *Game) make_screen() {
 func (g *Game) load_sprite(name string) int {
 	path := fmt.Sprintf("images/%s.png", name)
 	// debugf("Loading sprite '%s' from '%s'", name, path)
-	fd, err := os.Open(path)
-	if err != nil {
-		die("Failed to open image %s: %v", path, err)
-	}
-	defer fd.Close()
+	// fd, err := os.Open(path)
+	// if err != nil {
+	// 	die("Failed to open image %s: %v", path, err)
+	// }
+	// defer fd.Close()
 
-	goImage, _, err := image.Decode(fd)
+	data := MustAsset(path)
+
+	goImage, _, err := image.Decode(bytes.NewReader(data))
 	if err != nil {
 		die("Failed to decode image %s: %v", path, err)
 	}
