@@ -1,6 +1,10 @@
 This is a driver for johnroids for gopher js and go/wasm.  There is a
 very thin abstraction layer for the two different systems.
 
+![Johnroids GIF](../johnroids.gif "Johnroids in action")
+
+[Play the game online.](https://www.craig-wood.com/nick/johnroids/)
+
 ## Performance
 
 Times to plot the opening screen

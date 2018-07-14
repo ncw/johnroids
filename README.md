@@ -3,6 +3,8 @@ is to kill John.
 
 ![Johnroids GIF](johnroids.gif "Johnroids in action")
 
+[Play the game online.](https://www.craig-wood.com/nick/johnroids/)
+
 I wrote this game originally in 1991 on my Acorn Archimedes to
 annoy John when I was bored one rainy afternoon.  John came round and
 instead of being annoyed played the game for hours and hours - there
@@ -45,9 +47,30 @@ If you press "Toggle Keyboard" you'll get an onscreen keyboard
 which works pretty well on mobile devices.
 
 Shoot everything before it touches you. Note that you lose a point
-of score for every bullet you fire. Some of the roids may shoot at you
-- using thrust is a good idea at this point.  Things get very hectic
+of score for every bullet you fire. Some of the roids may shoot at you -
+using thrust is a good idea at this point.  Things get very hectic
 as you go through the levels.
+
+## Installation
+
+This repository contains 3 implementation of johnroids for SDL,
+gopherjs and go/wasm.
+
+If you want to try it locally then do
+
+    go get github.com/ncw/johnroids/...
+
+And run the `johnroids-sdl` binary.
+
+Note that you'll need the SDL headers and libraries installed for this
+to work.
+
+You can [play the gopherjs and go/wasm versions
+online](https://www.craig-wood.com/nick/johnroids/).
+
+To build these versions `cd to johnroids-js` then `make build` then
+`make serve`.  You may have to alter the path to your go1.11 binary in
+the Makefile.
 
 Enjoy
 
@@ -55,3 +78,4 @@ Nick Craig-Wood
 nick@craig-wood.com
 [@njcw](https://twitter.com/njcw)
 2018-07-14
+
