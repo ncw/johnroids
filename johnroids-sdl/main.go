@@ -4,7 +4,9 @@ package main
 import (
 	"flag"
 	"fmt"
+	"image"
 	"image/color"
+	"image/png"
 	"log"
 	"os"
 	"runtime/pprof"
@@ -85,6 +87,22 @@ func readEvents(g *johnroids.Game) {
 
 var cpuprofile = flag.String("cpuprofile", "", "write cpu profile to file")
 
+func saveScreen(screen image.Image, counter int) {
+	path := fmt.Sprintf("/tmp/johnroids-%08d.png", counter)
+	out, err := os.Create(path)
+	if err != nil {
+		log.Fatal(err)
+	}
+	err = png.Encode(out, screen)
+	if err != nil {
+		log.Fatal(err)
+	}
+	err = out.Close()
+	if err != nil {
+		log.Fatal(err)
+	}
+}
+
 func main() {
 	defer screen_initialise()()
 	flag.Parse()
@@ -98,9 +116,13 @@ func main() {
 	}
 	tick := time.NewTicker(johnroids.MinMsPerFrame * time.Millisecond)
 	g := johnroids.New()
+	counter := 0
 	for {
 		readEvents(g)
 		screen := g.Frame()
+
+		//saveScreen(screen, counter)
+		counter++
 
 		// Clear the screen
 		renderer.SetDrawColor(0, 0, 0, 255)
