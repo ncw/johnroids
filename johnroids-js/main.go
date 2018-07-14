@@ -1,4 +1,7 @@
 // Javascript version of johnroids
+
+// +build js
+
 package main
 
 import (
