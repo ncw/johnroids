@@ -48,12 +48,12 @@ import (
 const (
 	SW                  = 320
 	SH                  = 256
+	MinMsPerFrame       = 20
 	check_plot          = true
 	pixelshift          = 8
 	logshipfriction     = 8
 	maxobjects          = 4096 // must be a power of two
 	maxsprites          = 64
-	min_ms_per_frame    = 20
 	fade_colours        = 256
 	log_cos_table_scale = 16
 	cos_table_scale     = (1 << log_cos_table_scale)
@@ -1178,12 +1178,7 @@ func (g *Game) startupdate() {
 
 // This should be called after modifying the screen
 func (g *Game) endupdate() {
-	// Make sure we aren't showing frames too quickly
 	g.plot_time = get_ticks() - g.start_update_time
-	pause_time := min_ms_per_frame - g.plot_time
-	if pause_time > 0 {
-		time.Sleep(time.Millisecond * time.Duration(pause_time)) // FIXME
-	}
 }
 
 // This resets the bank switching

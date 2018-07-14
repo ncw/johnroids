@@ -8,6 +8,7 @@ import (
 	"log"
 	"os"
 	"runtime/pprof"
+	"time"
 
 	"github.com/ncw/johnroids"
 	"github.com/veandco/go-sdl2/sdl"
@@ -95,6 +96,7 @@ func main() {
 		pprof.StartCPUProfile(f)
 		defer pprof.StopCPUProfile()
 	}
+	tick := time.NewTicker(johnroids.MinMsPerFrame * time.Millisecond)
 	g := johnroids.New()
 	for {
 		readEvents(g)
@@ -123,6 +125,7 @@ func main() {
 		// show the changes
 		renderer.Present()
 
+		// wait for next tick
+		<-tick.C
 	}
-	// FIXME render
 }
