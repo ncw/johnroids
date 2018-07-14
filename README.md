@@ -1,6 +1,8 @@
 This is JohnRoids.  A simple but addictive game whose sole purpose
 is to kill John.
 
+![Johnroids GIF](johnroids.gif "Johnroids in action")
+
 I wrote this game originally in 1991 on my Acorn Archimedes to
 annoy John when I was bored one rainy afternoon.  John came round and
 instead of being annoyed played the game for hours and hours - there
