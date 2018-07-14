@@ -6,25 +6,165 @@
     <title>Johnroids</title>
     <style>
 #canvas-container {
-   width: 100%;
+   width: 320px;
    text-align: center;
+   border: 5px solid black;
 }
 
+body {
+width: 320px;
+margin: auto;
+}
 canvas {
-  display: inline;
+  display: block;
   background: #000;
 /*  transform: scale(2); these almost work! */
 /*  transform-origin: top; */
 }
+
+.keyboard {
+  margin: auto;
+  width: 320px;
+  height: 256px;
+  border: 1px solid black;
+  background: #EEE;
+  position: relative;
+}
+
+.key {
+  display: flex;
+  position: absolute;
+  justify-content: center;
+  align-items: center;
+  width: 100px;
+  height: 100px;
+  background: #CCC;
+  border-radius: 50%;
+  border: 10px solid black;
+  user-select: none;
+}
+.key.top { top: 0; }
+.key.right { right: 0; }
+.key.left { left: 0; }
+.key.bottom { bottom: 0; }
+.key.middle {
+top: 68px;
+right: 100px;
+}
+.key:active {
+  background: #888;
+}
+
+.button_box {
+  display: flex;
+  width: 320px;
+/*  border: 1px solid black; */
+  background: #EEE;
+  position: relative;
+}
+
+.button {
+  width: 100px;
+  background: #CCC;
+  border: 2px solid black;
+  text-decoration: none;
+  color: black;
+  user-select: none;
+}
+.button:active {
+  background: #888;
+}
+.title {
+  font-size: 130%;
+  background: #888;
+}
+.status {
+  background: #888;
+}
+
     </style>
   </head>
   <body>
     <script src="loader.js"></script>
     <div id="canvas-container">
-      <h1>Johnroids</h1>
+      <div class="title">Johnroids</div>
       <canvas id="game" width="320" height="256">Canvas not supported</canvas>
-      <p id="status">Loading - please wait</p>
-      <p>Try <a href="./">gopherjs</a> version or <a href="./?wasm">go/wasm</a> version.</p>
+      <div id="keyboard" class="keyboard" style="display: none;">
+        <div class="key top left" id="key_z">Z</div>
+        <div class="key bottom left" id="key_x">X</div>
+        <div class="key top right" id="key_return">Return</div>
+        <div class="key bottom right" id="key_shift">Shift</div>
+        <div class="key middle" id="key_space">Space</div>
+      </div>
+      <div class="status" id="status">Loading - please wait</div>
+      <div class="button_box">
+        <div class="button" id="toggle_keyboard">Toggle keyboard</div>
+        <div class="button" id="toggle_help">Toggle help</div>
+        <a class="button" href="./">Gopherjs version</a>
+        <a class="button" href="./?wasm">go/wasm version</a>
+      </div>
     </div>
+    <div id="help" style="display: none;">
+
+<p>This is JohnRoids.  A simple but addictive game whose sole purpose
+is to kill John.</p>
+
+<p>I wrote this game originally in 1991 on my Acorn Archimedes to
+annoy John when I was bored one rainy afternoon.  John came round and
+instead of being annoyed played the game for hours and hours - there
+is obviously some kind of perverse thrill in shooting oneself!</p>
+
+<p>Back in 1991 digitised pictures were still something of a rarity.
+I made the one of John from a camcorder video and an extremely hacky
+black and white video digitiser which I built myself.  Note there are
+actually two images of John - one looking happy and the other not!</p>
+
+<p>The original was written entirely in ARM assembler to make it go
+fast enough.  However I thought the program deserved not to wither
+away so in 2001 I ported it to C and SDL and in 2018 ported it to Go
+to run in the browser so many more hours can be wasted shooting at
+John.</p>
+
+<p>When you run the game you'll notice the playing area is rather
+small (320x256 pixels).  I'm afraid this was all that was available in
+1991!  I tried making the playing area bigger but the game lost some
+of its visceral thrill, so you are left with a small screen.  If you
+want it bigger use the zoom function of your browser.</p>
+
+<p>This is an entirely faithful conversion of the original except for the
+fact that I haven't put the sound back in yet.  The original samples
+are in a very strange format I haven't managed to translate.</p>
+
+<p>You can find the <a href="https://github.com/ncw/johnroids">source
+code on github</a> - report issues and send fixes there please!</p>
+
+<p>The instructions are printed on the screen to start, but to summarise
+they are:</p>
+
+<pre>
+Z      - Rotate left
+X      - Rotate right
+Shift  - Fire thruster
+Return - Fire gun
+Space  - Start the game
+</pre>
+
+<p>If you press "Toggle Keyboard" you'll get an onscreen keyboard
+which works pretty well on mobile devices.</p>
+
+<p>Shoot everything before it touches you. Note that you lose a point
+of score for every bullet you fire. Some of the roids may shoot at you
+- using thrust is a good idea at this point.  Things get very hectic
+as you go through the levels.</p>
+
+<p>Enjoy</p>
+
+<p>Nick Craig-Wood<br />
+nick@craig-wood.com<br />
+<a href="https://twitter.com/njcw">@njcw</a><br />
+2018-07-14</p>
+
+    </div>
+
   </body>
 </html>

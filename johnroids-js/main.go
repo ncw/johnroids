@@ -17,21 +17,40 @@ const (
 
 var document jsObject
 
+func getElementById(name string) jsObject {
+	node := document.Call("getElementById", name)
+	if isUndefined(node) {
+		log.Fatalf("Couldn't find element %q", name)
+	}
+	return node
+}
+
 func time() int {
 	return Global.Get("Date").New().Call("getTime").Int()
+}
+
+// Toggle the visibility of view when button is clicked
+func toggle(button, view string) {
+	buttonNode := getElementById(button)
+	viewNode := getElementById(view)
+	buttonNode.Call("addEventListener", "click", newCallback(func(args []jsObject) {
+		event := args[0]
+		event.Call("preventDefault")
+		state := viewNode.Get("style").Get("display").String()
+		if state == "none" {
+			state = "block"
+		} else {
+			state = "none"
+		}
+		viewNode.Get("style").Set("display", state)
+	}))
 }
 
 func initialise() {
 	g := johnroids.New()
 
-	canvas := document.Call("getElementById", "game")
-	if isUndefined(canvas) {
-		log.Fatalf("Couldn't find canvas")
-	}
-	status := document.Call("getElementById", "status")
-	if isUndefined(canvas) {
-		log.Fatalf("Couldn't find status")
-	}
+	canvas := getElementById("game")
+	status := getElementById("status")
 
 	ctx := canvas.Call("getContext", "2d")
 	// ctx.Call("scale", scale, scale)
@@ -45,6 +64,42 @@ func initialise() {
 	frameI := 0
 	var totalTime int
 	var start int
+
+	// Attach key handlers
+	for _, key := range []struct {
+		id   string
+		code johnroids.KeyCode
+	}{
+		{"key_z", johnroids.KeyCodeZ},
+		{"key_x", johnroids.KeyCodeX},
+		{"key_shift", johnroids.KeyCodeShift},
+		{"key_return", johnroids.KeyCodeReturn},
+		{"key_space", johnroids.KeyCodeSpace},
+	} {
+		node := getElementById(key.id)
+		code := key.code
+		// Attach mouse and touch handlers for each
+		for _, handler := range []struct {
+			handlerType string
+			pressed     bool
+		}{
+			{"mousedown", true},
+			{"mouseup", false},
+			{"touchstart", true},
+			{"touchend", false},
+		} {
+			pressed := handler.pressed
+			node.Call("addEventListener", handler.handlerType, newCallback(func(args []jsObject) {
+				event := args[0]
+				event.Call("preventDefault")
+				g.KeyEvent(code, pressed)
+			}))
+		}
+	}
+
+	// Attach button clicks
+	toggle("toggle_keyboard", "keyboard")
+	toggle("toggle_help", "help")
 
 	plot := func(args []jsObject) {
 		start = time()
@@ -79,7 +134,7 @@ func initialise() {
 			totalTime = 0
 		}
 	}
-	Global.Call("setInterval", newCallback(plot), 20)
+	Global.Call("setInterval", newCallback(plot), johnroids.MinMsPerFrame)
 
 	keyEvent := func(args []jsObject) {
 		event := args[0]
