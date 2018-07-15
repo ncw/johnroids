@@ -176,5 +176,6 @@ func main() {
 	if isUndefined(document) {
 		log.Fatalf("Didn't find document - not running in browser")
 	}
-	run(initialise)
+	initialise()
+	run()
 }

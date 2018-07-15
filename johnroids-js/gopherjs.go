@@ -29,8 +29,5 @@ func newCallback(fn func(args []jsObject)) jsObject {
 	})
 }
 
-func run(fn func()) {
-	// Run when the dom is loaded
-	//document.Call("addEventListener", "DOMContentLoaded", initialise, false)
-	initialise()
+func run() {
 }

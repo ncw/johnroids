@@ -23,8 +23,7 @@ func isUndefined(v js.Value) bool {
 	return v == js.Undefined()
 }
 
-func run(fn func()) {
-	// Run now and wait forever
-	initialise()
+func run() {
+	// Wait forever
 	select {}
 }
