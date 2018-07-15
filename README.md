@@ -5,6 +5,8 @@ is to kill John.
 
 [Play the game online.](https://www.craig-wood.com/nick/johnroids/)
 
+[See also Technical Writeup](johnroids-js/README.md)
+
 I wrote this game originally in 1991 on my Acorn Archimedes to
 annoy John when I was bored one rainy afternoon.  John came round and
 instead of being annoyed played the game for hours and hours - there
@@ -41,7 +43,7 @@ they are:
     X      - Rotate right
     Shift  - Fire thruster
     Return - Fire gun
-   Space  - Start the game
+    Space  - Start the game
 
 If you press "Toggle Keyboard" you'll get an onscreen keyboard
 which works pretty well on mobile devices.
@@ -74,8 +76,7 @@ the Makefile.
 
 Enjoy
 
-Nick Craig-Wood
-nick@craig-wood.com
-[@njcw](https://twitter.com/njcw)
+Nick Craig-Wood  
+nick@craig-wood.com  
+[@njcw](https://twitter.com/njcw)  
 2018-07-14
-
